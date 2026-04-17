@@ -7,7 +7,7 @@ COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun build
+RUN bun run build
 
 # ── Serve stage ──────────────────────────────────────────────────────────────
 # Reuse Bun (already in stack) to serve static files — no nginx dependency
