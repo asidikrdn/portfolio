@@ -10,29 +10,28 @@ COPY . .
 RUN bun run build
 
 # ── Serve stage ──────────────────────────────────────────────────────────────
-# Reuse Bun (already in stack) to serve static files — no nginx dependency
 FROM oven/bun:1-alpine AS runner
 
 WORKDIR /app
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist/client ./dist/client
+COPY --from=builder /app/dist/server ./dist/server
 
-# Inline static file server with SPA fallback
 RUN printf '%s\n' \
-    'const DIST = import.meta.dir + "/dist";' \
-    'const index = Bun.file(DIST + "/index.html");' \
+    'import app from "./dist/server/index.js";' \
+    'const port = Number(process.env.PORT) || 8080;' \
     'Bun.serve({' \
-    '  port: 8080,' \
+    '  port,' \
     '  async fetch(req) {' \
-    '    const path = new URL(req.url).pathname;' \
-    '    const file = Bun.file(DIST + path);' \
-    '    if (await file.exists()) return new Response(file);' \
-    '    const dir = Bun.file(DIST + path + "/index.html");' \
-    '    if (await dir.exists()) return new Response(dir);' \
-    '    return new Response(index);' \
+    '    const url = new URL(req.url);' \
+    '    if (url.pathname.startsWith("/assets/")) {' \
+    '      const file = Bun.file("./dist/client" + url.pathname);' \
+    '      if (await file.exists()) return new Response(file);' \
+    '    }' \
+    '    return app.fetch(req, {}, { waitUntil: () => {}, passThroughOnException: () => {} });' \
     '  },' \
     '});' \
-    'console.log("Server running on port 8080");' \
+    'console.log(`Server running on port ${port}`);' \
     > server.js
 
 EXPOSE 8080
